@@ -1,0 +1,6 @@
+video_device: "/dev/video2"
+framerate: 30
+resolution: "640x480" # "1920x1080"
+bitrate: 5000000  # 5 Mbps
+host: "0.0.0.0"
+port: 8080

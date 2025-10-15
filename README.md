@@ -7,3 +7,17 @@ This project aims to integrate WebRTC capabilities into ROS2 applications, enabl
 ## Block Diagram
 ![Block Diagram](./media/edge_rtc.excalidraw.png)
 
+## Installation
+
+```bash
+virtualenv edgertc_env
+source edgertc_env/bin/activate
+pip install -r edge_rtc/requirements.txt
+
+colcon build --symlink-install
+source install/setup.bash
+
+ros2 launch edge_rtc webrtc_video_server.launch.py
+
+ros2 launch edge_rtc webrtc_ros2_client.launch.py
+```
