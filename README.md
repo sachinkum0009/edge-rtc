@@ -21,3 +21,8 @@ ros2 launch edge_rtc webrtc_video_server.launch.py
 
 ros2 launch edge_rtc webrtc_ros2_client.launch.py
 ```
+
+## References
+- [WebRTC ROS](https://github.com/RobotWebTools/webrtc_ros)
+- [aiortc](https://github.com/aiortc/aiortc)
+- [WebRTC ROS2 Streamer](https://github.com/nicolecll/webrtc_ros2_streamer)
