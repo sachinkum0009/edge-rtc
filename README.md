@@ -7,6 +7,13 @@ This project aims to integrate WebRTC capabilities into ROS2 applications, enabl
 ## Block Diagram
 ![Block Diagram](./media/edge_rtc.excalidraw.png)
 
+## Demo
+
+
+https://github.com/user-attachments/assets/0e80663d-384c-43a8-868e-afb1480116e5
+
+
+
 ## Installation
 
 ```bash
