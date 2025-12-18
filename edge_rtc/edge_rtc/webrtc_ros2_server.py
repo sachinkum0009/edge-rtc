@@ -9,7 +9,6 @@ import json
 import os
 import threading
 import time
-from fractions import Fraction
 from typing import Optional, Set
 
 import cv2
@@ -19,52 +18,17 @@ from ament_index_python.packages import get_package_share_directory
 import yaml
 from aiohttp import web
 from aiortc import (
-    MediaStreamTrack,
     RTCPeerConnection,
     RTCRtpSender,
     RTCSessionDescription,
 )
 from aiortc.contrib.media import MediaPlayer, MediaRelay
-from av import VideoFrame
 from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 
 from edge_rtc.utils import EdgeRTCConfig
-
-
-class ImageVideoTrack(MediaStreamTrack):
-    """MediaStreamTrack for video, streaming images from the ROS node."""
-
-    kind = "video"
-
-    def __init__(self, ros2_server):
-        super().__init__()
-        self.start_time = time.time()
-        self.frames = 0
-        self.framerate = 30
-        self.ros2_server = ros2_server
-
-    async def next_timestamp(self):
-        """Calculates the timestamp for the next frame."""
-        self.frames += 1
-        next_time = self.start_time + (self.frames / self.framerate)
-        await asyncio.sleep(max(0, next_time - time.time()))
-        return int((next_time - self.start_time) * 1000)
-
-    async def recv(self):
-        """Receives the next video frame to be sent to the peer."""
-        frame = await self.get_frame()
-        image_frame = VideoFrame.from_ndarray(frame, format="bgr24")
-        image_frame.pts = await self.next_timestamp()
-        image_frame.time_base = Fraction(1, 1000)
-        return image_frame
-
-    async def get_frame(self):
-        """Retrieves the latest image frame from the ROS2 server."""
-        latest_frame = self.ros2_server.get_latest_image()
-        await asyncio.sleep(1.0 / self.framerate)
-        return latest_frame
+from edge_rtc.image_video_track import ImageVideoTrack
 
 
 class Ros2WebrtcServer(Node):
@@ -125,6 +89,7 @@ class Ros2WebrtcServer(Node):
         with self.lock:
             return self.new_image if self.new_image is not None else self.placeholder_image
 
+    # TODO(Sachin): Remove this later
     @staticmethod
     async def index(request: web.Request) -> web.Response:
         """Serve a simple HTML page for testing."""
