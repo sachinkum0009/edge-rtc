@@ -15,6 +15,7 @@ from typing import Optional, Set
 import cv2
 import numpy as np
 import rclpy
+from ament_index_python.packages import get_package_share_directory
 import yaml
 from aiohttp import web
 from aiortc import (
@@ -75,8 +76,9 @@ class Ros2WebrtcServer(Node):
 
     def __init__(self):
         super().__init__("ros2_webrtc_server")
-        # TODO: (Sachin) Get absolute path using ros2 api
-        with open("/home/asus/zzzzz/ros2/k3s/colcon_ws/src/edge-rtc/edge_rtc/config/server.yaml", "r") as f:
+        pkg_path = get_package_share_directory("edge_rtc")
+        server_config = os.path.join(pkg_path, "config/server.yaml")
+        with open(server_config) as f:
             config_data = yaml.safe_load(f)
         self.config = EdgeRTCConfig(**config_data)
         self.bridge = CvBridge()
