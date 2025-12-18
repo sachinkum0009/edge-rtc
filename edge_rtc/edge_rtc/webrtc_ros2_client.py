@@ -1,51 +1,45 @@
 #!/usr/bin/env python3
 
-"""
-WebRTC Video Client
-Receives video stream from WebRTC server and displays using OpenCV
+"""WebRTC Video Client
+Receives video stream from WebRTC server and displays using OpenCV.
 """
 
-import argparse
 import asyncio
 import logging
-from typing import Optional
-import time
 import queue
 import threading
+import time
 
 import aiohttp
 import cv2
-from aiortc import RTCPeerConnection, RTCSessionDescription
-from aiortc.rtcconfiguration import RTCConfiguration, RTCIceServer
-from av import VideoFrame
-
 import rclpy
-from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
-from sensor_msgs.msg import Image
+from aiortc import RTCPeerConnection, RTCSessionDescription
 from cv_bridge import CvBridge
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.node import Node
+from sensor_msgs.msg import Image
 
 logger = logging.getLogger("webrtc_client")
 
 class WebrtcVideoClient(Node):
-    """WebRTC Video Client Class to handle connection and video reception"""
-    
+    """WebRTC Video Client Class to handle connection and video reception."""
+
     def __init__(self):
         super().__init__("webrtc_video_client")
         self.running = True
         self.window_created = False
         self.frame_count = 0
         self.bridge = CvBridge()
-        self.img_pub = self.create_publisher(Image, 'webrtc_video_frames', 10)
+        self.img_pub = self.create_publisher(Image, "webrtc_video_frames", 10)
         self.last_time = time.time()
         self.frame_queue = queue.Queue(maxsize=2)  # Small queue to avoid lag
-        
+
         # Start publishing thread
         self.pub_thread = threading.Thread(target=self._publish_loop, daemon=True)
         self.pub_thread.start()
-        
+
     def _publish_loop(self):
-        """Continuously publish frames from queue"""
+        """Continuously publish frames from queue."""
         while self.running:
             try:
                 img = self.frame_queue.get(timeout=1.0)
@@ -53,7 +47,7 @@ class WebrtcVideoClient(Node):
                 ros_img.header.stamp = self.get_clock().now().to_msg()
                 self.img_pub.publish(ros_img)
                 self.frame_count += 1
-                
+
                 # Log FPS
                 current_time = time.time()
                 if self.frame_count % 30 == 0:
@@ -64,35 +58,35 @@ class WebrtcVideoClient(Node):
                 continue
             except Exception as e:
                 logger.error(f"Error in publish loop: {e}")
-                
+
 
     def queue_frame(self, img):
-        """Queue frame for publishing (non-blocking)"""
+        """Queue frame for publishing (non-blocking)."""
         try:
             self.frame_queue.put_nowait(img)
         except queue.Full:
             # Drop frame if queue is full to maintain real-time performance
             pass
 
-        
+
     def cleanup(self):
-        """Clean up resources"""
+        """Clean up resources."""
         self.running = False
         cv2.destroyAllWindows()
 
 async def app():
     rclpy.init()
     webrtc_client = WebrtcVideoClient()
-    
+
     # Create executor in separate thread
     executor = MultiThreadedExecutor()
     executor.add_node(webrtc_client)
-    
+
     # Run ROS2 executor in background thread
     import threading
     ros_thread = threading.Thread(target=executor.spin, daemon=True)
     ros_thread.start()
-    
+
     pc = RTCPeerConnection()
 
     @pc.on("track")
@@ -109,7 +103,7 @@ async def app():
                 except Exception as e:
                     logger.error(f"Error receiving frame: {e}")
                     break
-    
+
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
         logger.info(f"Connection state: {pc.connectionState}")
@@ -129,7 +123,7 @@ async def app():
         await asyncio.sleep(0.1)
 
     # send offer to server
-    offer_url = "http://localhost:8080/offer"  # Change to your server URL
+    offer_url = "http://100.76.123.28:8080/offer"  # Change to your server URL
 
     async with aiohttp.ClientSession() as session:
         async with session.post(

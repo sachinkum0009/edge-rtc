@@ -1,46 +1,40 @@
 #! /usr/bin/env python3
 
-"""
-WebRTC Video Streamer Server for ROS2 Topics
-Streams video from ROS2 image topic to connected WebRTC clients
+"""WebRTC Video Streamer Server for ROS2 Topics
+Streams video from ROS2 image topic to connected WebRTC clients.
 """
 
-import os
-import sys
-import logging
-import yaml
-import json
 import asyncio
-import time
+import json
+import os
 import threading
+import time
 from fractions import Fraction
+from typing import Optional, Set
 
+import cv2
+import numpy as np
+import rclpy
+import yaml
 from aiohttp import web
 from aiortc import (
     MediaStreamTrack,
     RTCPeerConnection,
+    RTCRtpSender,
     RTCSessionDescription,
 )
 from aiortc.contrib.media import MediaPlayer, MediaRelay
-from aiortc import RTCRtpSender, RTCRtpCodecCapability
 from av import VideoFrame
+from cv_bridge import CvBridge
+from rclpy.node import Node
+from sensor_msgs.msg import Image
 
 from edge_rtc.utils import EdgeRTCConfig
 
-from typing import List, Set, Optional
-
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
-import cv2
-import numpy as np
-
 
 class ImageVideoTrack(MediaStreamTrack):
-    """
-    MediaStreamTrack for video, streaming images from the ROS node.
-    """
+    """MediaStreamTrack for video, streaming images from the ROS node."""
+
     kind = "video"
 
     def __init__(self, ros2_server):
@@ -51,18 +45,14 @@ class ImageVideoTrack(MediaStreamTrack):
         self.ros2_server = ros2_server
 
     async def next_timestamp(self):
-        """
-        Calculates the timestamp for the next frame.
-        """
+        """Calculates the timestamp for the next frame."""
         self.frames += 1
         next_time = self.start_time + (self.frames / self.framerate)
         await asyncio.sleep(max(0, next_time - time.time()))
         return int((next_time - self.start_time) * 1000)
 
     async def recv(self):
-        """
-        Receives the next video frame to be sent to the peer.
-        """
+        """Receives the next video frame to be sent to the peer."""
         frame = await self.get_frame()
         image_frame = VideoFrame.from_ndarray(frame, format="bgr24")
         image_frame.pts = await self.next_timestamp()
@@ -70,48 +60,47 @@ class ImageVideoTrack(MediaStreamTrack):
         return image_frame
 
     async def get_frame(self):
-        """
-        Retrieves the latest image frame from the ROS2 server.
-        """
+        """Retrieves the latest image frame from the ROS2 server."""
         latest_frame = self.ros2_server.get_latest_image()
         await asyncio.sleep(1.0 / self.framerate)
         return latest_frame
 
 
 class Ros2WebrtcServer(Node):
-    """ROS2 Node to stream video from image topic via WebRTC"""
+    """ROS2 Node to stream video from image topic via WebRTC."""
+
     pcs : Set[RTCPeerConnection] = set()
     relay: Optional[MediaRelay] = None
     video_source: Optional[MediaPlayer] = None
-    
+
     def __init__(self):
         super().__init__("ros2_webrtc_server")
         # TODO: (Sachin) Get absolute path using ros2 api
-        with open('/home/asus/zzzzz/ros2/k3s/colcon_ws/src/edge-rtc/edge_rtc/config/server.yaml', 'r') as f:
+        with open("/home/asus/zzzzz/ros2/k3s/colcon_ws/src/edge-rtc/edge_rtc/config/server.yaml", "r") as f:
             config_data = yaml.safe_load(f)
         self.config = EdgeRTCConfig(**config_data)
         self.bridge = CvBridge()
-        
+
         # Image buffering
         self.lock = threading.Lock()
         self.latest_image = None
         self.new_image = None
         self.fps = 30
         self.last_time = time.time()
-        
+
         # Create placeholder image (640x480 black image with text)
         self.placeholder_image = self.create_placeholder_image()
-        
+
         self.subscription = self.create_subscription(
             Image,
-            'image_raw',
+            "image_raw",
             self.image_callback,
             10
         )
         self.get_logger().info("ROS2 WebRTC Server Node Initialized")
-    
+
     def create_placeholder_image(self):
-        """Create a placeholder image when no data is available"""
+        """Create a placeholder image when no data is available."""
         img = cv2.imread("placeholder.jpg") if os.path.exists("placeholder.jpg") else None
         if img is None:
             # Create black image with text
@@ -119,43 +108,41 @@ class Ros2WebrtcServer(Node):
             cv2.putText(img, "Waiting for ROS2 images...", (50, 240),
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         return img
-        
+
     def image_callback(self, msg: Image):
-        """Callback to handle incoming image messages"""
+        """Callback to handle incoming image messages."""
         current_time = time.time()
         if current_time - self.last_time >= 1.0 / self.fps:
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
             with self.lock:
                 self.new_image = cv_image
             self.last_time = current_time
 
     def get_latest_image(self):
-        """
-        Returns the latest processed image or a placeholder if none available.
-        """
+        """Returns the latest processed image or a placeholder if none available."""
         with self.lock:
             return self.new_image if self.new_image is not None else self.placeholder_image
 
     @staticmethod
     async def index(request: web.Request) -> web.Response:
-        """Serve a simple HTML page for testing"""
+        """Serve a simple HTML page for testing."""
         html_content = """
         <!DOCTYPE html>
         <html>
         <head>
             <title>WebRTC Video Server</title>
             <style>
-                body { 
-                    font-family: Arial, sans-serif; 
-                    max-width: 800px; 
-                    margin: 50px auto; 
+                body {
+                    font-family: Arial, sans-serif;
+                    max-width: 800px;
+                    margin: 50px auto;
                     padding: 20px;
                 }
                 h1 { color: #333; }
-                .status { 
-                    padding: 10px; 
-                    background: #f0f0f0; 
-                    border-radius: 5px; 
+                .status {
+                    padding: 10px;
+                    background: #f0f0f0;
+                    border-radius: 5px;
                     margin: 20px 0;
                 }
                 code {
@@ -180,9 +167,7 @@ class Ros2WebrtcServer(Node):
         return web.Response(content_type="text/html", text=html_content)
 
     async def offer(self, request: web.Request) -> web.Response:
-        """
-        Handle WebRTC offer from client and return answer
-        """
+        """Handle WebRTC offer from client and return answer."""
         params = await request.json()
         offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
 
@@ -203,7 +188,7 @@ class Ros2WebrtcServer(Node):
 
         @pc.on("datachannel")
         def on_datachannel(channel):
-            """Handle data channel for latency/RTT measurements"""
+            """Handle data channel for latency/RTT measurements."""
             @channel.on("message")
             def on_message(message):
                 if isinstance(message, str) and message.startswith("ping"):
@@ -215,14 +200,14 @@ class Ros2WebrtcServer(Node):
 
         # Create and add video track
         image_track = ImageVideoTrack(self)
-        
+
         # Force H.264 codec if available
         h264_codecs = [
             codec
             for codec in RTCRtpSender.getCapabilities("video").codecs
             if codec.mimeType == "video/H264"
         ]
-        
+
         if h264_codecs:
             transceiver = pc.addTransceiver("video")
             transceiver.setCodecPreferences(h264_codecs)
@@ -250,7 +235,7 @@ class Ros2WebrtcServer(Node):
         )
 
     def run(self):
-        """Run the WebRTC video server"""
+        """Run the WebRTC video server."""
         app = web.Application()
         app.on_shutdown.append(self.on_shutdown)
         app.router.add_get("/", self.index)
@@ -265,7 +250,7 @@ class Ros2WebrtcServer(Node):
         )
 
     async def on_shutdown(self, app: web.Application):
-        """Cleanup on server shutdown"""
+        """Cleanup on server shutdown."""
         coros = [pc.close() for pc in self.pcs]
         await asyncio.gather(*coros)
         self.pcs.clear()
@@ -275,11 +260,11 @@ class Ros2WebrtcServer(Node):
 def main(args=None):
     rclpy.init(args=args)
     server = Ros2WebrtcServer()
-    
+
     # Start ROS2 spin in a separate thread
     ros_thread = threading.Thread(target=lambda: rclpy.spin(server), daemon=True)
     ros_thread.start()
-    
+
     try:
         # Run the web server (blocking)
         server.run()

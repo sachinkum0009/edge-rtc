@@ -1,45 +1,42 @@
 #!/home/asus/zzzzz/ros2/k3s/colcon_ws/venvs/webrtc/bin/python
+"""WebRTC Video Streaming Server
+Streams video from webcam or video file to connected clients.
 """
-WebRTC Video Streaming Server
-Streams video from webcam or video file to connected clients
-"""
+import json
+import logging
 import os
 import sys
-import logging
-import yaml
-import json
+from typing import Optional, Set
 
+import yaml
 from aiohttp import web
 from aiortc import (
     MediaStreamTrack,
     RTCPeerConnection,
+    RTCRtpSender,
     RTCSessionDescription,
 )
 from aiortc.contrib.media import MediaPlayer, MediaRelay
-from aiortc import RTCRtpSender, RTCRtpCodecCapability
 
 from edge_rtc.utils import EdgeRTCConfig
-
-from typing import List, Set, Optional
 
 logger = logging.getLogger("webrtc_server")
 
 
 class WebrtcVideoServer:
-    """
-    WebRTC Video Server Class which manages peer connections and video tracks
-    """
+    """WebRTC Video Server Class which manages peer connections and video tracks."""
+
     pcs : Set[RTCPeerConnection] = set()
     relay: Optional[MediaRelay] = None
     video_source: Optional[MediaPlayer] = None
     def __init__(self):
         # TODO: (Sachin) Get absolute path using ros2 api
-        with open('/home/asus/zzzzz/ros2/k3s/colcon_ws/src/edge-rtc/edge_rtc/config/server.yaml', 'r') as f:
+        with open("/home/asus/zzzzz/ros2/k3s/colcon_ws/src/edge-rtc/edge_rtc/config/server.yaml", "r") as f:
             config_data = yaml.safe_load(f)
         self.config = EdgeRTCConfig(**config_data)
 
     def run(self):
-        """Run the WebRTC video server"""
+        """Run the WebRTC video server."""
         app = web.Application()
         app.on_shutdown.append(self.on_shutdown)
         app.router.add_get("/", self.index)
@@ -54,16 +51,16 @@ class WebrtcVideoServer:
         )
 
     def create_video_track(self) -> Optional[MediaStreamTrack]:
-        """
-        Create a video track from webcam or file source
-        
+        """Create a video track from webcam or file source.
+
         Args:
             source_path: Path to video file, or None for webcam
             use_webcam: Whether to use webcam if no source_path
             use_nvidia: Whether to use NVIDIA hardware encoding
-        
+
         Returns:
             MediaStreamTrack for video
+
         """
         # Play from webcam using MediaRelay for multiple clients
         if self.relay is None:
@@ -80,12 +77,10 @@ class WebrtcVideoServer:
         if self.video_source and self.video_source.video:
             return self.relay.subscribe(self.video_source.video)
         return None
-    
+
 
     async def offer(self, request: web.Request) -> web.Response:
-        """
-        Handle WebRTC offer from client and return answer
-        """
+        """Handle WebRTC offer from client and return answer."""
         params = await request.json()
         offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
 
@@ -142,24 +137,24 @@ class WebrtcVideoServer:
 
     @staticmethod
     async def index(request: web.Request) -> web.Response:
-        """Serve a simple HTML page for testing"""
+        """Serve a simple HTML page for testing."""
         html_content = """
         <!DOCTYPE html>
         <html>
         <head>
             <title>WebRTC Video Server</title>
             <style>
-                body { 
-                    font-family: Arial, sans-serif; 
-                    max-width: 800px; 
-                    margin: 50px auto; 
+                body {
+                    font-family: Arial, sans-serif;
+                    max-width: 800px;
+                    margin: 50px auto;
                     padding: 20px;
                 }
                 h1 { color: #333; }
-                .status { 
-                    padding: 10px; 
-                    background: #f0f0f0; 
-                    border-radius: 5px; 
+                .status {
+                    padding: 10px;
+                    background: #f0f0f0;
+                    border-radius: 5px;
                     margin: 20px 0;
                 }
                 code {
@@ -184,7 +179,7 @@ class WebrtcVideoServer:
         return web.Response(content_type="text/html", text=html_content)
 
     async def on_shutdown(self, app: web.Application):
-        """Cleanup on server shutdown"""
+        """Cleanup on server shutdown."""
         pass
 
 def main():

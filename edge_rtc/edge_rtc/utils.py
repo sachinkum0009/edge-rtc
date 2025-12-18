@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
-"""
-Utils for Edge RTC
-"""
+"""Utils for Edge RTC."""
 
 from dataclasses import dataclass
-from typing import List
+
 
 @dataclass
 class EdgeRTCConfig:
