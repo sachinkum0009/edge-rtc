@@ -79,7 +79,7 @@ class Ros2WebrtcServer(Node):
         """Callback to handle incoming image messages."""
         current_time = time.time()
         if current_time - self.last_time >= 1.0 / self.fps:
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
             with self.lock:
                 self.new_image = cv_image
             self.last_time = current_time
