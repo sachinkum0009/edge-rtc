@@ -24,15 +24,18 @@ logger = logging.getLogger("webrtc_client")
 class WebrtcVideoClient(Node):
     """WebRTC Video Client Class to handle connection and video reception."""
 
-    def __init__(self):
+    def __init__(self, topic_name: str = "image_raw"):
         super().__init__("webrtc_video_client")
         self.running = True
         self.window_created = False
         self.frame_count = 0
         self.bridge = CvBridge()
+        self.topic_name = topic_name
         self.img_pub = self.create_publisher(Image, "webrtc_video_frames", 10)
         self.last_time = time.time()
         self.frame_queue = queue.Queue(maxsize=2)  # Small queue to avoid lag
+        
+        logger.info(f"Client configured for topic: {topic_name}")
 
         # Start publishing thread
         self.pub_thread = threading.Thread(target=self._publish_loop, daemon=True)
@@ -74,9 +77,9 @@ class WebrtcVideoClient(Node):
         self.running = False
         cv2.destroyAllWindows()
 
-async def app():
+async def app(server_url: str = "http://100.76.123.28:8080", topic: str = "image_raw"):
     rclpy.init()
-    webrtc_client = WebrtcVideoClient()
+    webrtc_client = WebrtcVideoClient(topic_name=topic)
 
     # Create executor in separate thread
     executor = MultiThreadedExecutor()
@@ -123,7 +126,7 @@ async def app():
         await asyncio.sleep(0.1)
 
     # send offer to server
-    offer_url = "http://100.76.123.28:8080/offer"  # Change to your server URL
+    offer_url = f"{server_url}/offer"
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
@@ -131,11 +134,13 @@ async def app():
             json={
                 "sdp": pc.localDescription.sdp,
                 "type": pc.localDescription.type,
+                "topic": topic,
             },
             headers={"Content-Type": "application/json"},
         ) as resp:
             if resp.status != 200:
-                logger.error(f"Failed to send offer: {resp.status}")
+                error_text = await resp.text()
+                logger.error(f"Failed to send offer: {resp.status} - {error_text}")
                 return
             answer_data = await resp.json()
             logger.info("Received answer")
@@ -159,8 +164,23 @@ async def app():
         logger.info("Connection closed")
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="WebRTC Video Client")
+    parser.add_argument(
+        "--server-url",
+        default="http://100.76.123.28:8080",
+        help="WebRTC server URL (default: http://100.76.123.28:8080)"
+    )
+    parser.add_argument(
+        "--topic",
+        default="image_raw",
+        help="ROS2 image topic to subscribe to (default: image_raw)"
+    )
+    args = parser.parse_args()
+    
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(app())
+    logger.info(f"Connecting to {args.server_url} for topic {args.topic}")
+    asyncio.run(app(server_url=args.server_url, topic=args.topic))
 
 if __name__ == "__main__":
     main()

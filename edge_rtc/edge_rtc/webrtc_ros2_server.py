@@ -10,6 +10,7 @@ import os
 import threading
 import time
 from typing import Optional, Set
+from numpy.typing import NDArray
 
 import cv2
 import numpy as np
@@ -25,6 +26,9 @@ from aiortc import (
 from aiortc.contrib.media import MediaPlayer, MediaRelay
 from cv_bridge import CvBridge
 from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
+from rcl_interfaces.msg import ParameterDescriptor
 from sensor_msgs.msg import Image
 
 from edge_rtc.utils import EdgeRTCConfig
@@ -34,60 +38,102 @@ from edge_rtc.image_video_track import ImageVideoTrack
 class Ros2WebrtcServer(Node):
     """ROS2 Node to stream video from image topic via WebRTC."""
 
-    pcs : Set[RTCPeerConnection] = set()
+    pcs: Set[RTCPeerConnection] = set()
     relay: Optional[MediaRelay] = None
     video_source: Optional[MediaPlayer] = None
+    latest_images: dict[str, Optional[NDArray]]
 
     def __init__(self):
         super().__init__("ros2_webrtc_server")
+        self.declare_parameter(
+            "image_topics",
+            value=["image_raw"],
+            descriptor=ParameterDescriptor(
+                description="List of image topics to stream"
+            ),
+        )
+
+        self.image_topics = list(
+            self.get_parameter("image_topics").get_parameter_value().string_array_value
+        )
+
+        self.callback_group = ReentrantCallbackGroup()
+
         pkg_path = get_package_share_directory("edge_rtc")
         server_config = os.path.join(pkg_path, "config/server.yaml")
         with open(server_config) as f:
             config_data = yaml.safe_load(f)
+        if config_data is None:
+            config_data = {}
         self.config = EdgeRTCConfig(**config_data)
         self.bridge = CvBridge()
 
         # Image buffering
         self.lock = threading.Lock()
-        self.latest_image = None
-        self.new_image = None
+        self.latest_images = {}  # Dictionary to store latest image per topic
+        self.last_times = {}  # Track last update time per topic
         self.fps = 30
-        self.last_time = time.time()
 
         # Create placeholder image (640x480 black image with text)
         self.placeholder_image = self.create_placeholder_image()
+        
+        # Initialize storage for each topic
+        for topic in self.image_topics:
+            self.latest_images[topic] = None
+            self.last_times[topic] = time.time()
 
-        self.subscription = self.create_subscription(
-            Image,
-            "image_raw",
-            self.image_callback,
-            10
-        )
+        for image_topic in self.image_topics:
+            self.get_logger().info(f"Subscribing to: {image_topic}")
+            self.create_subscription(
+                Image,
+                image_topic,
+                lambda msg, t=image_topic: self.image_callback(msg, t),
+                10,
+                callback_group=self.callback_group,
+            )
+
         self.get_logger().info("ROS2 WebRTC Server Node Initialized")
 
     def create_placeholder_image(self):
         """Create a placeholder image when no data is available."""
-        img = cv2.imread("placeholder.jpg") if os.path.exists("placeholder.jpg") else None
+        img = (
+            cv2.imread("placeholder.jpg") if os.path.exists("placeholder.jpg") else None
+        )
         if img is None:
             # Create black image with text
             img = np.zeros((480, 640, 3), dtype=np.uint8)
-            cv2.putText(img, "Waiting for ROS2 images...", (50, 240),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            cv2.putText(
+                img,
+                "Waiting for ROS2 images...",
+                (50, 240),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (255, 255, 255),
+                2,
+            )
         return img
 
-    def image_callback(self, msg: Image):
+    def image_callback(self, msg: Image, topic_name: str):
         """Callback to handle incoming image messages."""
         current_time = time.time()
-        if current_time - self.last_time >= 1.0 / self.fps:
+        if current_time - self.last_times.get(topic_name, 0) >= 1.0 / self.fps:
             cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
             with self.lock:
-                self.new_image = cv_image
-            self.last_time = current_time
+                self.latest_images[topic_name] = cv_image
+            self.last_times[topic_name] = current_time
 
-    def get_latest_image(self):
-        """Returns the latest processed image or a placeholder if none available."""
+    def get_latest_image(self, topic_name: str):
+        """Returns the latest processed image for a topic or a placeholder if none available."""
         with self.lock:
-            return self.new_image if self.new_image is not None else self.placeholder_image
+            image = self.latest_images.get(topic_name)
+            if image is not None:
+                return image
+            self.get_logger().debug(f"No image available for topic {topic_name}, using placeholder")
+            return self.placeholder_image
+    
+    def get_available_topics(self):
+        """Returns list of available image topics."""
+        return self.image_topics
 
     # TODO(Sachin): Remove this later
     @staticmethod
@@ -137,12 +183,30 @@ class Ros2WebrtcServer(Node):
         """Handle WebRTC offer from client and return answer."""
         params = await request.json()
         offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
+        
+        # Get requested topic from params (default to first topic if not specified)
+        requested_topic = params.get("topic", self.image_topics[0])
+        
+        # Validate requested topic
+        if requested_topic not in self.image_topics:
+            self.get_logger().warning(
+                f"Requested topic '{requested_topic}' not available. "
+                f"Available topics: {self.image_topics}"
+            )
+            return web.Response(
+                status=400,
+                content_type="application/json",
+                text=json.dumps({
+                    "error": f"Topic '{requested_topic}' not available",
+                    "available_topics": self.image_topics
+                })
+            )
 
         # Create new peer connection
         pc = RTCPeerConnection()
         self.pcs.add(pc)
 
-        self.get_logger().info("Received WebRTC offer")
+        self.get_logger().info(f"Received WebRTC offer for topic: {requested_topic}")
 
         @pc.on("connectionstatechange")
         async def on_connectionstatechange() -> None:
@@ -156,6 +220,7 @@ class Ros2WebrtcServer(Node):
         @pc.on("datachannel")
         def on_datachannel(channel):
             """Handle data channel for latency/RTT measurements."""
+
             @channel.on("message")
             def on_message(message):
                 if isinstance(message, str) and message.startswith("ping"):
@@ -165,8 +230,8 @@ class Ros2WebrtcServer(Node):
                     rtt = int(message[7:])
                     self.get_logger().info(f"RTT: {rtt}ms")
 
-        # Create and add video track
-        image_track = ImageVideoTrack(self)
+        # Create and add video track for the requested topic
+        image_track = ImageVideoTrack(self, requested_topic)
 
         # Force H.264 codec if available
         h264_codecs = [
@@ -195,10 +260,24 @@ class Ros2WebrtcServer(Node):
 
         return web.Response(
             content_type="application/json",
-            text=json.dumps({
-                "sdp": pc.localDescription.sdp,
-                "type": pc.localDescription.type
-            }),
+            text=json.dumps(
+                {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
+            ),
+        )
+
+    async def topics(self, request: web.Request) -> web.Response:
+        """Return list of available image topics."""
+        topics_data = {
+            "topics": self.image_topics,
+            "count": len(self.image_topics),
+            "active_topics": [
+                topic for topic, img in self.latest_images.items() if img is not None
+            ]
+        }
+        self.get_logger().debug(f"Topics requested: {topics_data}")
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(topics_data)
         )
 
     def run(self):
@@ -206,8 +285,11 @@ class Ros2WebrtcServer(Node):
         app = web.Application()
         app.on_shutdown.append(self.on_shutdown)
         app.router.add_get("/", self.index)
+        app.router.add_get("/topics", self.topics)
         app.router.add_post("/offer", self.offer)
-        self.get_logger().info(f"Starting server on {self.config.host}:{self.config.port}")
+        self.get_logger().info(
+            f"Starting server on {self.config.host}:{self.config.port}"
+        )
 
         web.run_app(
             app,
@@ -228,8 +310,11 @@ def main(args=None):
     rclpy.init(args=args)
     server = Ros2WebrtcServer()
 
+    executor = MultiThreadedExecutor()
+    executor.add_node(server)
+
     # Start ROS2 spin in a separate thread
-    ros_thread = threading.Thread(target=lambda: rclpy.spin(server), daemon=True)
+    ros_thread = threading.Thread(target=executor.spin, daemon=True)
     ros_thread.start()
 
     try:
@@ -238,6 +323,7 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         server.destroy_node()
         rclpy.shutdown()
         ros_thread.join(timeout=2.0)

@@ -11,7 +11,7 @@ setup(
             ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + "/config", ["config/server.yaml", "config/image_topics.yaml"]),
-        ("share/" + package_name + "/launch", ["launch/webrtc_video_server.launch.py", "launch/webrtc_ros2_client.launch.py"]),
+        ("share/" + package_name + "/launch", ["launch/webrtc_video_server.launch.py", "launch/webrtc_ros2_client.launch.py", "launch/webrtc_ros2_server.launch.py"]),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -24,6 +24,7 @@ setup(
         "console_scripts": [
             "webrtc_video_server = edge_rtc.webrtc_video_server:main",
             "webrtc_ros2_client = edge_rtc.webrtc_ros2_client:main",
+            "webrtc_ros2_server = edge_rtc.webrtc_ros2_server:main"
         ],
     },
 )
