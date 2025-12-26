@@ -7,6 +7,9 @@ import asyncio
 from aiortc import MediaStreamTrack
 from fractions import Fraction
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ImageVideoTrack(MediaStreamTrack):
     """MediaStreamTrack for video, streaming images from the ROS node."""
@@ -18,6 +21,8 @@ class ImageVideoTrack(MediaStreamTrack):
         self.framerate = 30
         self.ros2_server = ros2_server
         self.topic_name = topic_name
+        self.send_count = 0
+        logger.info(f"ImageVideoTrack created for topic: {topic_name}")
 
     async def next_timestamp(self):
         """Calculates the timestamp for the next frame."""
@@ -32,6 +37,11 @@ class ImageVideoTrack(MediaStreamTrack):
         image_frame = VideoFrame.from_ndarray(frame, format="bgr24")
         image_frame.pts = await self.next_timestamp()
         image_frame.time_base = Fraction(1, 1000)
+        
+        self.send_count += 1
+        if self.send_count % 30 == 0:
+            logger.info(f"[{self.topic_name}] Sent {self.send_count} frames to WebRTC peer")
+        
         return image_frame
 
     async def get_frame(self):

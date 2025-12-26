@@ -52,10 +52,12 @@ class TopicHandler:
     
     def _publish_loop(self):
         """Continuously publish frames from queue for this topic."""
+        print("started publish loop")
         while self.running:
+            print("publishing data")
             try:
                 img = self.frame_queue.get(timeout=1.0)
-                ros_img = self.bridge.cv2_to_imgmsg(img, encoding="bgr8")
+                ros_img = self.bridge.cv2_to_imgmsg(img, encoding="passthrough")
                 ros_img.header.stamp = self.node.get_clock().now().to_msg()
                 ros_img.header.frame_id = self.topic_name
                 self.publisher.publish(ros_img)
@@ -161,6 +163,7 @@ async def create_peer_connection(server_url: str, topic: str, webrtc_client: Web
     async def on_track(track):
         logger.info(f"[{topic}] Track {track.kind} received")
         if track.kind == "video":
+            frame_count = 0
             while webrtc_client.running:
                 try:
                     frame = await track.recv()
@@ -168,9 +171,18 @@ async def create_peer_connection(server_url: str, topic: str, webrtc_client: Web
                     img = frame.to_ndarray(format="bgr24")
                     # Queue frame for publishing (non-blocking)
                     handler.queue_frame(img)
-                except Exception as e:
-                    logger.error(f"[{topic}] Error receiving frame: {e}")
+                    frame_count += 1
+                    
+                    # Log every 30 frames
+                    if frame_count % 30 == 0:
+                        logger.info(f"[{topic}] Received {frame_count} frames, shape: {img.shape}")
+                except asyncio.CancelledError:
+                    logger.info(f"[{topic}] Track recv cancelled")
                     break
+                except Exception as e:
+                    logger.error(f"[{topic}] Error receiving frame: {e}", exc_info=True)
+                    break
+            logger.info(f"[{topic}] Track recv loop ended, total frames: {frame_count}")
 
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():

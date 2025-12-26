@@ -1,8 +1,4 @@
 /**:
   ros__parameters:
     image_topics:
-      - /camera/front/image_raw
-      - /camera/rear/image_raw
-      - /camera/left/image_raw
-      - /camera/right/image_raw
       - /image_raw

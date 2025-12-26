@@ -72,7 +72,8 @@ class Ros2WebrtcServer(Node):
         self.lock = threading.Lock()
         self.latest_images = {}  # Dictionary to store latest image per topic
         self.last_times = {}  # Track last update time per topic
-        self.fps = 30
+        self.image_receive_count = {}  # Track number of images received per topic
+        self.fps = 30  # Target FPS for WebRTC streaming
 
         # Create placeholder image (640x480 black image with text)
         self.placeholder_image = self.create_placeholder_image()
@@ -80,7 +81,8 @@ class Ros2WebrtcServer(Node):
         # Initialize storage for each topic
         for topic in self.image_topics:
             self.latest_images[topic] = None
-            self.last_times[topic] = time.time()
+            self.last_times[topic] = 0
+            self.image_receive_count[topic] = 0
 
         for image_topic in self.image_topics:
             self.get_logger().info(f"Subscribing to: {image_topic}")
@@ -115,12 +117,27 @@ class Ros2WebrtcServer(Node):
 
     def image_callback(self, msg: Image, topic_name: str):
         """Callback to handle incoming image messages."""
-        current_time = time.time()
-        if current_time - self.last_times.get(topic_name, 0) >= 1.0 / self.fps:
+        try:
             cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+            
+            # Ensure image is in BGR format for WebRTC
+            if len(cv_image.shape) == 2:  # Grayscale
+                cv_image = cv2.cvtColor(cv_image, cv2.COLOR_GRAY2BGR)
+            elif cv_image.shape[2] == 4:  # RGBA
+                cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGBA2BGR)
+            
             with self.lock:
                 self.latest_images[topic_name] = cv_image
-            self.last_times[topic_name] = current_time
+                self.image_receive_count[topic_name] += 1
+                
+            # Log periodically
+            if self.image_receive_count[topic_name] % 30 == 0:
+                self.get_logger().info(
+                    f"Received {self.image_receive_count[topic_name]} images from {topic_name}, "
+                    f"size: {cv_image.shape}"
+                )
+        except Exception as e:
+            self.get_logger().error(f"Error processing image from {topic_name}: {e}")
 
     def get_latest_image(self, topic_name: str):
         """Returns the latest processed image for a topic or a placeholder if none available."""
