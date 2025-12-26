@@ -10,7 +10,7 @@ setup(
         ("share/ament_index/resource_index/packages",
             ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
-        ("share/" + package_name + "/config", ["config/server.yaml", "config/image_topics.yaml"]),
+        ("share/" + package_name + "/config", ["config/server.yaml", "config/image_topics.yaml", "config/client.yaml"]),
         ("share/" + package_name + "/launch", ["launch/webrtc_video_server.launch.py", "launch/webrtc_ros2_client.launch.py", "launch/webrtc_ros2_server.launch.py"]),
     ],
     install_requires=["setuptools"],
