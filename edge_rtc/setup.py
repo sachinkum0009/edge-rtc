@@ -24,7 +24,8 @@ setup(
         "console_scripts": [
             "webrtc_video_server = edge_rtc.webrtc_video_server:main",
             "webrtc_ros2_client = edge_rtc.webrtc_ros2_client:main",
-            "webrtc_ros2_server = edge_rtc.webrtc_ros2_server:main"
+            "webrtc_ros2_server = edge_rtc.webrtc_ros2_server:main",
+            "cam_img_pub = edge_rtc.cam_img_pub:main"
         ],
     },
 )
