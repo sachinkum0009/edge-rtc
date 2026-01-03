@@ -52,12 +52,10 @@ class TopicHandler:
     
     def _publish_loop(self):
         """Continuously publish frames from queue for this topic."""
-        print("started publish loop")
         while self.running:
-            print("publishing data")
             try:
                 img = self.frame_queue.get(timeout=1.0)
-                ros_img = self.bridge.cv2_to_imgmsg(img, encoding="passthrough")
+                ros_img = self.bridge.cv2_to_imgmsg(img, encoding="bgr8")
                 ros_img.header.stamp = self.node.get_clock().now().to_msg()
                 ros_img.header.frame_id = self.topic_name
                 self.publisher.publish(ros_img)
