@@ -23,7 +23,9 @@ virtualenv edgertc_env
 source edgertc_env/bin/activate
 pip install -r edge_rtc/requirements.txt
 
-colcon build --symlink-install
+export PYTHONPATH=$PYTHONPATH:/<path_to_venv>/edgertc_env/lib/python3.*/site-packages
+
+colcon build --symlink-install --packages-select edge_rtc
 source install/setup.bash
 
 ros2 launch edge_rtc webrtc_video_server.launch.py
