@@ -14,6 +14,7 @@ from typing import Dict, Optional
 
 import aiohttp
 import cv2
+import numpy as np
 import rclpy
 import yaml
 from ament_index_python.packages import get_package_share_directory
@@ -55,7 +56,26 @@ class TopicHandler:
         while self.running:
             try:
                 img = self.frame_queue.get(timeout=1.0)
-                ros_img = self.bridge.cv2_to_imgmsg(img, encoding="bgr8")
+                # Convert incoming image to single-channel 16-bit (16UC1)
+                if img is None:
+                    continue
+
+                # If color (BGR), convert to grayscale
+                if hasattr(img, "ndim") and img.ndim == 3 and img.shape[2] == 3:
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                elif hasattr(img, "ndim") and img.ndim == 2:
+                    gray = img
+                else:
+                    logger.error(f"[{self.topic_name}] Unexpected image shape: {getattr(img, 'shape', None)}")
+                    continue
+
+                # Convert to uint16. Map 0-255 -> 0-65535 using multiplier 257 for even spread.
+                if gray.dtype != np.uint16:
+                    gray16 = (gray.astype(np.uint16) * 257)
+                else:
+                    gray16 = gray
+
+                ros_img = self.bridge.cv2_to_imgmsg(gray16, encoding="16UC1")
                 ros_img.header.stamp = self.node.get_clock().now().to_msg()
                 ros_img.header.frame_id = self.topic_name
                 self.publisher.publish(ros_img)

@@ -99,8 +99,9 @@ class Ros2WebrtcServer(Node):
     def create_placeholder_image(self):
         """Create a placeholder image when no data is available."""
         img = (
-            cv2.imread("placeholder.jpg") if os.path.exists("placeholder.jpg") else None
+            cv2.imread("1341848067.862808.png") if os.path.exists("1341848067.862808.png") else None
         )
+        print(f"Placeholder image loaded: {img is not None}")
         if img is None:
             # Create black image with text
             img = np.zeros((480, 640, 3), dtype=np.uint8)

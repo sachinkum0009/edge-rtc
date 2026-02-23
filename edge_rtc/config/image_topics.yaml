@@ -1,4 +1,4 @@
 /**:
   ros__parameters:
     image_topics:
-      - /image_raw
+      - /depth
