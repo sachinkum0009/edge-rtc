@@ -8,7 +8,7 @@ from aiortc import (
     RTCRtpSender,
     RTCSessionDescription,
 )
-from aiortc.contrib.media import MediaPlayer, MediaRelay
+from aiortc.contrib.media import MediaRelay
 from image_video_track import ImageVideoTrack
 from utils import EdgeRTCConfig
 import logging

@@ -8,7 +8,6 @@ from utils import EdgeRTCConfig
 import numpy as np
 from numpy.typing import NDArray
 import os
-import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rtc_server import RtcServer
@@ -69,13 +68,13 @@ class RtcRos2Server(Node, RtcServer):
 
     def image_callback(self, msg: Image):
         """Callback function for incoming ROS2 image messages."""
-        # try:
-        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
-        with self.lock:
-            self.latest_images[self.image_topics[0]] = cv_image
-        self.get_logger().debug(f"Received image on topic {self.image_topics[0]}")
-        # except CvBridgeError as e:
-        #     self.get_logger().error(f"Failed to convert ROS Image message: {e}")
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+            with self.lock:
+                self.latest_images[self.image_topics[0]] = cv_image
+            self.get_logger().debug(f"Received image on topic {self.image_topics[0]}")
+        except CvBridgeError as e:
+            self.get_logger().error(f"Failed to convert ROS Image message: {e}")
 
     def get_latest_image(self, topic_name: str) -> NDArray:
         """Returns the latest processed image for a topic or a placeholder if none available."""
@@ -88,6 +87,6 @@ class RtcRos2Server(Node, RtcServer):
             )
             return self.placeholder_image
 
-    def get_available_topics(self):
+    def get_available_topics(self) -> list[str]:
         """Returns list of available image topics."""
         return self.image_topics

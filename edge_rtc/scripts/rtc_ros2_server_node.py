@@ -17,7 +17,7 @@ def main(args=None):
         host="0.0.0.0",
         port=8081,
     )
-    image_topics = ["/depth"]
+    image_topics = ["/camera/color", "/camera/depth"]
     server = RtcRos2Server(config, image_topics)
     executor = MultiThreadedExecutor()
     executor.add_node(server)

@@ -13,3 +13,9 @@ class EdgeRTCConfig:
     bitrate: int
     host: str = "0.0.0.0"
     port: int = 8080
+
+
+@dataclass
+class ImageType:
+    COLOR = 0
+    DEPTH = 1
