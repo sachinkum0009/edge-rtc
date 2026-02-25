@@ -1,4 +1,5 @@
 /**:
   ros__parameters:
     image_topics:
-      - /depth
+      - /camera/color
+      - /camera/depth

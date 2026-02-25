@@ -9,8 +9,8 @@ from aiortc import (
     RTCSessionDescription,
 )
 from aiortc.contrib.media import MediaRelay
-from image_video_track import ImageVideoTrack
-from utils import EdgeRTCConfig
+from edge_rtc.image_video_track import ImageVideoTrack
+from edge_rtc.utils import EdgeRTCConfig
 import logging
 import json
 import asyncio
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class RtcServer:
     config: Optional[EdgeRTCConfig] = None
     image_topics: list[str] = []
-    latest_images: dict[str, NDArray] = {}
+    latest_images: dict[str, NDArray | None] = {}
     pcs: set[RTCPeerConnection] = set()
     video_sources: Optional[MediaRelay] = None
 

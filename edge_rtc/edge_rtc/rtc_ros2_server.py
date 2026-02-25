@@ -4,13 +4,13 @@ RTC ROS2 Server
 
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-from utils import EdgeRTCConfig
+from edge_rtc.utils import EdgeRTCConfig
+from edge_rtc.rtc_server import RtcServer
 import numpy as np
 from numpy.typing import NDArray
 import os
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
-from rtc_server import RtcServer
 from sensor_msgs.msg import Image
 import threading
 
@@ -33,13 +33,38 @@ class RtcRos2Server(Node, RtcServer):
         # Create placeholder image (640x480 black image with text)
         self.placeholder_image = self.create_placeholder_image()
 
-        self.image_sub = self.create_subscription(
-            Image,
-            self.image_topics[0],  # Assuming one topic for simplicity
-            self.image_callback,
-            10,
-            callback_group=self.callback_group,
-        )
+        self.last_times = {}  # Track last update time per topic
+        self.image_receive_count = {}  # Track number of images received per topic
+
+        # Initialize storage for each topic
+        for topic in self.image_topics:
+            self.latest_images[topic] = None
+            self.last_times[topic] = 0
+            self.image_receive_count[topic] = 0
+
+        for image_topic in self.image_topics:
+            self.get_logger().info(f"Subscribing to: {image_topic}")
+            self.create_subscription(
+                Image,
+                image_topic,
+                lambda msg, t=image_topic: self.image_callback(msg, t),  # type: ignore
+                10,
+                callback_group=self.callback_group,
+            )
+
+    def image_callback(self, msg: Image, topic_name: str):
+        """Callback function for incoming ROS2 image messages."""
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+            with self.lock:
+                self.latest_images[topic_name] = cv_image
+                self.image_receive_count[topic_name] += 1
+        except CvBridgeError as e:
+            self.get_logger().error(
+                f"CvBridge error processing image from {topic_name}: {e}"
+            )
+        except Exception as e:
+            self.get_logger().error(f"Error processing image from {topic_name}: {e}")
 
     def create_placeholder_image(self):
         """Create a placeholder image when no data is available."""
@@ -65,16 +90,6 @@ class RtcRos2Server(Node, RtcServer):
                 2,
             )
         return img
-
-    def image_callback(self, msg: Image):
-        """Callback function for incoming ROS2 image messages."""
-        try:
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
-            with self.lock:
-                self.latest_images[self.image_topics[0]] = cv_image
-            self.get_logger().debug(f"Received image on topic {self.image_topics[0]}")
-        except CvBridgeError as e:
-            self.get_logger().error(f"Failed to convert ROS Image message: {e}")
 
     def get_latest_image(self, topic_name: str) -> NDArray:
         """Returns the latest processed image for a topic or a placeholder if none available."""
