@@ -48,7 +48,7 @@ class ImageVideoTrack(MediaStreamTrack):
 
         self.send_count += 1
         if self.send_count % 30 == 0:
-            logger.info(
+            logger.debug(
                 f"[{self.topic_name}] Sent {self.send_count} frames to WebRTC peer"
             )
 

@@ -97,7 +97,7 @@ class TopicHandler:
                 current_time = time.time()
                 if self.frame_count % 30 == 0:
                     fps = 30 / (current_time - self.last_time)
-                    logger.info(f"[{self.topic_name}] Publishing at {fps:.1f} Hz")
+                    logger.debug(f"[{self.topic_name}] Publishing at {fps:.1f} Hz")
                     self.last_time = current_time
             except queue.Empty:
                 continue
@@ -206,16 +206,16 @@ async def create_peer_connection(
 
                     # Log every 30 frames
                     if frame_count % 30 == 0:
-                        logger.info(
+                        logger.debug(
                             f"[{topic}] Received {frame_count} frames, shape: {img.shape}"
                         )
                 except asyncio.CancelledError:
-                    logger.info(f"[{topic}] Track recv cancelled")
+                    logger.debug(f"[{topic}] Track recv cancelled")
                     break
                 except Exception as e:
                     logger.error(f"[{topic}] Error receiving frame: {e}", exc_info=True)
                     break
-            logger.info(f"[{topic}] Track recv loop ended, total frames: {frame_count}")
+            logger.debug(f"[{topic}] Track recv loop ended, total frames: {frame_count}")
 
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
