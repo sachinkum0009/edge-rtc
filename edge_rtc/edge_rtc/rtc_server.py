@@ -204,7 +204,7 @@ class RtcServer:
         self.pcs.clear()
         logger.info("Server shutdown complete")
 
-    async def get_latest_image(self, topic_name: str) -> NDArray:
+    def get_latest_image(self, topic_name: str) -> NDArray:
         """Returns the latest processed image for a topic or a placeholder if none available."""
         image = self.latest_images.get(topic_name)
         if image is not None:

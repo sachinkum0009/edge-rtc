@@ -4,13 +4,13 @@ RTC ROS2 Server
 
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-from edge_rtc.utils import EdgeRTCConfig
+from utils import EdgeRTCConfig
 import numpy as np
+from numpy.typing import NDArray
 import os
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
-from rclpy.executors import MultiThreadedExecutor
 from rtc_server import RtcServer
 from sensor_msgs.msg import Image
 import threading
@@ -45,10 +45,14 @@ class RtcRos2Server(Node, RtcServer):
     def create_placeholder_image(self):
         """Create a placeholder image when no data is available."""
         img = (
-            cv2.imread("1341848067.862836.png") if os.path.exists("1341848067.862836.png") else None
+            cv2.imread("1341848067.862836.png")
+            if os.path.exists("1341848067.862836.png")
+            else None
             # cv2.imread("1341848067.862808.png") if os.path.exists("1341848067.862808.png") else None
         )
-        print(f"type of placeholder image: {type(img)}, shape: {img.shape if img is not None else 'N/A'}")
+        print(
+            f"type of placeholder image: {type(img)}, shape: {img.shape if img is not None else 'N/A'}"
+        )
         if img is None:
             # Create black image with text
             img = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -73,7 +77,7 @@ class RtcRos2Server(Node, RtcServer):
         # except CvBridgeError as e:
         #     self.get_logger().error(f"Failed to convert ROS Image message: {e}")
 
-    def get_latest_image(self, topic_name: str):
+    def get_latest_image(self, topic_name: str) -> NDArray:
         """Returns the latest processed image for a topic or a placeholder if none available."""
         with self.lock:
             image = self.latest_images.get(topic_name)
@@ -87,38 +91,3 @@ class RtcRos2Server(Node, RtcServer):
     def get_available_topics(self):
         """Returns list of available image topics."""
         return self.image_topics
-
-
-def main(args=None):
-    """Main function to run the RtcRos2Server."""
-    rclpy.init(args=args)
-    config = EdgeRTCConfig(
-        video_device="/dev/video2",
-        framerate=30,
-        resolution="640x480",
-        bitrate=5000000,
-        host="0.0.0.0",
-        port=8081,
-    )
-    image_topics = ["/depth"]
-    server = RtcRos2Server(config, image_topics)
-    executor = MultiThreadedExecutor()
-    executor.add_node(server)
-
-    # Start ROS2 spin in a separate thread
-    ros_thread = threading.Thread(target=executor.spin, daemon=True)
-    ros_thread.start()
-
-    try:
-        # Run the web server (blocking)
-        server.run()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        executor.shutdown()
-        server.destroy_node()
-        rclpy.shutdown()
-        ros_thread.join(timeout=2.0)
-
-if __name__ == "__main__":
-    main()
