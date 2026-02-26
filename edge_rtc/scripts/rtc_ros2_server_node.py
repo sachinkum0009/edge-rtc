@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
 
+
+from ament_index_python.packages import get_package_share_directory
 from edge_rtc.rtc_ros2_server import RtcRos2Server
 from edge_rtc.utils import EdgeRTCConfig
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 import threading
+import yaml
+
 
 def main(args=None):
     """Main function to run the RtcRos2Server."""
     rclpy.init(args=args)
-    config = EdgeRTCConfig(
-        video_device="/dev/video2",
-        framerate=30,
-        resolution="640x480",
-        bitrate=5000000,
-        host="0.0.0.0",
-        port=8081,
-    )
+    pkg_path = get_package_share_directory("edge_rtc")
+    config_file = f"{pkg_path}/config/server.yaml"
+    with open(config_file, "r") as f:
+        config_data = yaml.safe_load(f)
+    # if not isinstance(config_data, dict):
+    #     config_data = {}
+    if isinstance(config_data, dict):
+        config = EdgeRTCConfig(**config_data)
+    else:
+        raise ValueError(f"Invalid configuration format in {config_file}")
     image_topics = ["/camera/color", "/camera/depth"]
     server = RtcRos2Server(config, image_topics)
     executor = MultiThreadedExecutor()
@@ -36,6 +42,7 @@ def main(args=None):
         server.destroy_node()
         rclpy.shutdown()
         ros_thread.join(timeout=2.0)
+
 
 if __name__ == "__main__":
     main()

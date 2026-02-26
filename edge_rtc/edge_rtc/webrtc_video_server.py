@@ -2,6 +2,7 @@
 """WebRTC Video Streaming Server
 Streams video from webcam or video file to connected clients.
 """
+
 import json
 import logging
 import os
@@ -17,9 +18,9 @@ from aiortc import (
     RTCSessionDescription,
 )
 from aiortc.contrib.media import MediaPlayer, MediaRelay
-
-from edge_rtc.utils import EdgeRTCConfig
 from ament_index_python.packages import get_package_share_directory
+from edge_rtc.utils import EdgeRTCConfig
+
 
 logger = logging.getLogger("webrtc_server")
 
@@ -27,14 +28,17 @@ logger = logging.getLogger("webrtc_server")
 class WebrtcVideoServer:
     """WebRTC Video Server Class which manages peer connections and video tracks."""
 
-    pcs : Set[RTCPeerConnection] = set()
+    pcs: Set[RTCPeerConnection] = set()
     relay: Optional[MediaRelay] = None
     video_source: Optional[MediaPlayer] = None
+
     def __init__(self):
         pkg_path = get_package_share_directory("edge_rtc")
         config_file = os.path.join(pkg_path, "config", "server.yaml")
         with open(config_file, "r") as f:
             config_data = yaml.safe_load(f)
+        if config_data is None or not isinstance(config_data, dict):
+            raise ValueError(f"Invalid configuration format in {config_file}")
         self.config = EdgeRTCConfig(**config_data)
 
     def run(self):
@@ -66,20 +70,24 @@ class WebrtcVideoServer:
         """
         # Play from webcam using MediaRelay for multiple clients
         if self.relay is None:
-            options = {"framerate": f"{self.config.framerate}", "video_size": f"{self.config.resolution}"}
+            options = {
+                "framerate": f"{self.config.framerate}",
+                "video_size": f"{self.config.resolution}",
+            }
             if not os.path.exists(self.config.video_device):
                 logger.error(f"Video device {self.config.video_device} does not exist")
                 sys.exit(1)
 
             logger.info(f"Using video device: {self.config.video_device}")
-            self.video_source = MediaPlayer(self.config.video_device, format="v4l2", options=options)
+            self.video_source = MediaPlayer(
+                self.config.video_device, format="v4l2", options=options
+            )
 
             self.relay = MediaRelay()
 
         if self.video_source and self.video_source.video:
             return self.relay.subscribe(self.video_source.video)
         return None
-
 
     async def offer(self, request: web.Request) -> web.Response:
         """Handle WebRTC offer from client and return answer."""
@@ -131,10 +139,9 @@ class WebrtcVideoServer:
 
         return web.Response(
             content_type="application/json",
-            text=json.dumps({
-                "sdp": pc.localDescription.sdp,
-                "type": pc.localDescription.type
-            }),
+            text=json.dumps(
+                {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
+            ),
         )
 
     @staticmethod
@@ -184,6 +191,7 @@ class WebrtcVideoServer:
         """Cleanup on server shutdown."""
         pass
 
+
 def main():
     logging.basicConfig(level=logging.INFO)
     webrtc_server = WebrtcVideoServer()
@@ -191,6 +199,7 @@ def main():
         webrtc_server.run()
     except Exception as e:
         logger.error(f"Error running server: {e}")
+
 
 if __name__ == "__main__":
     main()
