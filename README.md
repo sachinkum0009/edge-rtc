@@ -14,7 +14,34 @@ This project aims to integrate WebRTC capabilities into ROS2 applications, enabl
 
 https://github.com/user-attachments/assets/0e80663d-384c-43a8-868e-afb1480116e5
 
+## Architecture
 
+```mermaid
+flowchart LR
+  subgraph App["EdgeRTC App"]
+    Main[main.py] --> Config[EdgeRTCConfig]
+    Main --> Provider[ImageProvider async queue / per-topic]
+    Main --> Adapter[RtcRos2Adapter rclpy thread]
+    Main --> Server[RtcServer aiohttp + aiortc]
+    Adapter -->|publishtopic, frame| Provider
+    Server -->|HTTP /offer| PC[RTCPeerConnection]
+    PC -->|addTrack ImageVideoTrack| Track[ImageVideoTrack]
+    Track -->|await get_latesttopic| Provider
+    Track -->|VideoFrame| PC
+  end
+
+  subgraph ROS2["ROS2"]
+    Cameras[/camera topics/] -->|Image msgs| Adapter
+  end
+
+  subgraph Client["WebRTC Client / Browser"]
+    Browser -->|POST /offer sdp, topic| Server
+    Browser <-->|SDP answer + media| PC
+  end
+
+  Cameras --> Adapter
+  Browser --> Server
+```
 
 ## Installation
 
