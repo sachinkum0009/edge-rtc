@@ -68,27 +68,17 @@ class RtcRos2Server(Node, RtcServer):
 
     def create_placeholder_image(self):
         """Create a placeholder image when no data is available."""
-        img = (
-            cv2.imread("1341848067.862836.png")
-            if os.path.exists("1341848067.862836.png")
-            else None
-            # cv2.imread("1341848067.862808.png") if os.path.exists("1341848067.862808.png") else None
+        # Create black image with text
+        img = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(
+            img,
+            "Waiting for ROS2 images...",
+            (50, 240),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (255, 255, 255),
+            2,
         )
-        print(
-            f"type of placeholder image: {type(img)}, shape: {img.shape if img is not None else 'N/A'}"
-        )
-        if img is None:
-            # Create black image with text
-            img = np.zeros((480, 640, 3), dtype=np.uint8)
-            cv2.putText(
-                img,
-                "Waiting for ROS2 images...",
-                (50, 240),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (255, 255, 255),
-                2,
-            )
         return img
 
     def get_latest_image(self, topic_name: str) -> NDArray:
