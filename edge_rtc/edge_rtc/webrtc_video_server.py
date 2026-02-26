@@ -19,6 +19,7 @@ from aiortc import (
 from aiortc.contrib.media import MediaPlayer, MediaRelay
 
 from edge_rtc.utils import EdgeRTCConfig
+from ament_index_python.packages import get_package_share_directory
 
 logger = logging.getLogger("webrtc_server")
 
@@ -30,8 +31,9 @@ class WebrtcVideoServer:
     relay: Optional[MediaRelay] = None
     video_source: Optional[MediaPlayer] = None
     def __init__(self):
-        # TODO: (Sachin) Get absolute path using ros2 api
-        with open("/home/asus/zzzzz/ros2/k3s/colcon_ws/src/edge-rtc/edge_rtc/config/server.yaml", "r") as f:
+        pkg_path = get_package_share_directory("edge_rtc")
+        config_file = os.path.join(pkg_path, "config", "server.yaml")
+        with open(config_file, "r") as f:
             config_data = yaml.safe_load(f)
         self.config = EdgeRTCConfig(**config_data)
 
