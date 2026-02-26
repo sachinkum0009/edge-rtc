@@ -84,6 +84,12 @@ class RtcServer:
         offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
 
         # Get requested topic from params (default to first topic if not specified)
+        if not self.image_topics:
+            return web.Response(
+                status=500,
+                content_type="application/json",
+                text=json.dumps({"error": "No image topics configured"}),
+            )
         requested_topic = params.get("topic", self.image_topics[0])
 
         # Validate requested topic

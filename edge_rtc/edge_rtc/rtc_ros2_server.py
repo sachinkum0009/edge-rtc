@@ -8,7 +8,6 @@ from edge_rtc.utils import EdgeRTCConfig
 from edge_rtc.rtc_server import RtcServer
 import numpy as np
 from numpy.typing import NDArray
-import os
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from sensor_msgs.msg import Image
@@ -22,7 +21,6 @@ class RtcRos2Server(Node, RtcServer):
         """Initialize the RtcRos2Server with the given configuration and image topics."""
         Node.__init__(self, "rtc_ros2_server")
         RtcServer.__init__(self, config, image_topics)
-        self.callback_group = ReentrantCallbackGroup()
         self.get_logger().info("RtcRos2Server initialized with ROS2 integration")
 
         self.callback_group = ReentrantCallbackGroup()
