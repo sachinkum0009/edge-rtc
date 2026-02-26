@@ -198,7 +198,7 @@ def main():
     try:
         webrtc_server.run()
     except Exception as e:
-        logger.error(f"Error running server: {e}")
+        logger.exception(f"Error running server: {e}")
 
 
 if __name__ == "__main__":

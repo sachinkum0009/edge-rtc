@@ -103,7 +103,7 @@ class TopicHandler:
             except queue.Empty:
                 continue
             except Exception as e:
-                logger.error(f"[{self.topic_name}] Error in publish loop: {e}")
+                logger.exception(f"[{self.topic_name}] Error in publish loop: {e}")
 
     def queue_frame(self, img):
         """Queue frame for publishing (non-blocking)."""
