@@ -44,8 +44,34 @@ class ImageVideoTrack(MediaStreamTrack):
         
         return image_frame
 
-    async def get_frame(self):
-        """Retrieves the latest image frame from the ROS2 server for the specified topic."""
-        latest_frame = self.ros2_server.get_latest_image(self.topic_name)
+    async def get_frame(self) -> NDArray:
+        """Retrieves the latest image frame from the RTC server for the specified topic."""
+        latest_frame: NDArray = self.rtc_server.get_latest_image(self.topic_name)
+
+        # Ensure we have a numpy array; if not, create a black placeholder
+        if latest_frame is None:
+            logger.info(f"No image data available for topic {self.topic_name}, sending placeholder")
+            latest_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+
+        # If depth image, conver to BGR
+        if self.image_type == ImageType.DEPTH:
+            if len(latest_frame.shape) == 2:
+                latest_frame = cv2.cvtColor(latest_frame, cv2.COLOR_GRAY2BGR)
+
+            # If not uint8, attempt to convert safely
+            if latest_frame.dtype != np.uint8:
+                if latest_frame.dtype == np.uint16:
+                    # scale 16-bit -> 8-bit
+                    latest_frame = (latest_frame >> 8).astype(np.uint8)
+                else:
+                    # fallback: normalize/clamp into uint8 range
+                    latest_frame = np.clip(latest_frame, 0, 255).astype(np.uint8)
+
+        # If Image is BGRA, convert to BGR
+        else:
+            if latest_frame.shape[2] == 4:
+                latest_frame = cv2.cvtColor(latest_frame, cv2.COLOR_BGRA2BGR)
+
         await asyncio.sleep(1.0 / self.framerate)
         return latest_frame

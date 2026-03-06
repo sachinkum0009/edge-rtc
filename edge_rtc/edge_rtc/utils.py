@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 @dataclass
 class EdgeRTCConfig:
-    video_device: str
+    video_device: str | None
     framerate: int
     resolution: str
     bitrate: int
